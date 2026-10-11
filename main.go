@@ -219,9 +219,14 @@ func walk(location string, depth int, drawDepths []int) int {
 
 		if isLast {
 			outputFormat += "└─"
-			indexOfDepth := slices.Index(drawDepths, depth)
-			if indexOfDepth != -1 {
-				drawDepths = append(drawDepths[:indexOfDepth], drawDepths[indexOfDepth+1:]...)
+			// If it's the very last item, remove all draw depths except the deepest
+			if depth == 0 {
+				drawDepths = []int{}
+			} else {
+				indexOfDepth := slices.Index(drawDepths, depth)
+				if indexOfDepth != -1 {
+					drawDepths = append(drawDepths[:indexOfDepth], drawDepths[indexOfDepth+1:]...)
+				}
 			}
 		} else {
 			outputFormat += "├─"
