@@ -400,11 +400,16 @@ func main() {
 		}
 		positionalArgs = append(positionalArgs, cwd)
 	}
-	for _, positionalArg := range positionalArgs {
+	for idx, positionalArg := range positionalArgs {
 
 		if _, err := os.Stat(positionalArg); errors.Is(err, os.ErrNotExist) {
 			fmt.Println(err)
 		} else {
+			// Print a blank line to separate multiple diagrams
+			if idx != 0 {
+				fmt.Println()
+			}
+
 			fmt.Println("\x1b[1m" + positionalArg + "\x1b[22m")
 			drawDepths := []int{1}
 			walk(positionalArg, 0, drawDepths)
