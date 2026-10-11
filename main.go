@@ -39,6 +39,7 @@ var (
 	showOwner bool
 	showGroup bool
 	showType bool
+	showErrors bool
 
 	fileTypeLookup = map[FileType]string{
 		Regular: "regular",
@@ -93,6 +94,8 @@ func usage() {
 	fmt.Println()
 	fmt.Println("\t-y, --show-type\tShow type symbol of file in output")
 	fmt.Println()
+	fmt.Println("\t-e, --show-errors\tShow file access errors")
+	fmt.Println()
 	fmt.Println("\t-a, --no-hidden\tHide hidden files")
 	fmt.Println()
 }
@@ -138,12 +141,12 @@ func lookUpOwnerGroup(filePath string) (string, string) {
 	fstat := syscall.Stat_t{}
 
 	file, err := os.Open(filePath)
-	if err != nil {
+	if err != nil && showErrors {
 		fmt.Println(err)
 	}
 
 	err = syscall.Fstat(int(file.Fd()), &fstat)
-	if err != nil {
+	if err != nil && showErrors {
 		fmt.Println(err)
 	}
 
@@ -161,13 +164,13 @@ func walk(location string, depth int, drawDepths []int) int {
 		return numFilesPrinted
 	}
 
-	if _, err := os.Stat(location); errors.Is(err, os.ErrNotExist) {
+	if _, err := os.Stat(location); errors.Is(err, os.ErrNotExist) && showErrors {
 		fmt.Println(location, "does not exist")
 		return numFilesPrinted
 	}
 
 	dirContents, err := os.ReadDir(location)
-	if err != nil {
+	if err != nil && showErrors {
 		log.Println("unable to read content of", location, ":", err)
 	}
 
@@ -206,7 +209,7 @@ func walk(location string, depth int, drawDepths []int) int {
 
 			for remainingFileIndex = range remainingFileCount-1 {
 				info, err := dirContents[idx+remainingFileIndex+1].Info()
-				if err != nil {
+				if err != nil && showErrors {
 					fmt.Println(err)
 				}
 				ft := getFileType(info.Mode())
@@ -280,7 +283,10 @@ func walk(location string, depth int, drawDepths []int) int {
 		if fileType == Link {
 			linkTarget, err := os.Readlink(filePath)
 			if err != nil {
-				fmt.Println(err)
+				if showErrors {
+					fmt.Println(err)
+				}
+				linkTarget = "<unknown>"
 			}
 			outputFormat += fmt.Sprintf(" ► %s", linkTarget)
 		}
@@ -369,6 +375,8 @@ func main() {
 				showGroup = true
 			case "show-type", "y":
 				showType = true
+			case "show-error", "e":
+				showErrors = true
 			case "no-hidden", "a":
 				noHidden = true
 			default:
@@ -396,13 +404,13 @@ func main() {
 	if len(positionalArgs) == 0 {
 		cwd, err := os.Getwd()
 		if err != nil {
-			log.Fatal(err)
+			fmt.Println(err)
 		}
 		positionalArgs = append(positionalArgs, cwd)
 	}
 	for idx, positionalArg := range positionalArgs {
 
-		if _, err := os.Stat(positionalArg); errors.Is(err, os.ErrNotExist) {
+		if _, err := os.Stat(positionalArg); errors.Is(err, os.ErrNotExist) && showErrors {
 			fmt.Println(err)
 		} else {
 			// Print a blank line to separate multiple diagrams
@@ -414,6 +422,5 @@ func main() {
 			drawDepths := []int{1}
 			walk(positionalArg, 0, drawDepths)
 		}
-
 	}
 }
