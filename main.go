@@ -83,8 +83,7 @@ func usage() {
 	fmt.Println("\t\t\t\t* s: socket")
 	fmt.Println("\t\t\t\t* p: named pipe")
 	fmt.Println("\t\t\tIf this option isn't specified, the default is to show")
-	fmt.Println("\t\t\tall file types. Note that parent directories are always")
-	fmt.Println("\t\t\tprinted if they contain a file type that is filtered for.")
+	fmt.Println("\t\t\tall file types. Directories are always printed.")
 	fmt.Println()
 	fmt.Println("\t-p, --perm\tShow file permissions")
 	fmt.Println()
@@ -156,7 +155,6 @@ func lookUpOwnerGroup(filePath string) (string, string) {
 // FIX: Return the number of files printed? Then that number can be used to determine if a directory's
 // name should be printed based on if it contained any files types that were filtered-for.
 func walk(location string, depth int, drawDepths []int) int {
-	var isLast bool = false
 	var numFilesPrinted int
 
 	if depth == maxDepth {
@@ -175,15 +173,16 @@ func walk(location string, depth int, drawDepths []int) int {
 
 	for idx, dirEntry := range dirContents {
 		var outputFormat string
+		// We assume this is the last file in the dir until proven otherwise
+		var isLast bool = true
+
 		filePath := path.Join(location, dirEntry.Name())
 
 		fileInfo, _ := dirEntry.Info()
 		fileType := getFileType(fileInfo.Mode())
 
 		// Don't bother continuing processing if the filetype of the current file hasn't been filtered for
-		// by the user. Special case for directories, as we may want to print them if they contain types 
-		// that have been filtered for.
-		if !slices.Contains(types, fileType) && fileType != Directory {
+		if !slices.Contains(types, fileType) {
 			continue
 		}
 
@@ -199,15 +198,31 @@ func walk(location string, depth int, drawDepths []int) int {
 			}
 		}
 
-		if idx == len(dirContents)-1 {
-			// FIX: This breaks if any file types are filtered-for, as the last file printed
-			// will not be the same as the last file in the dirContents slice
+		var remainingFileCount, remainingFileIndex int
+		// Figure out if the current file is the last file
+		if idx != len(dirContents)-1 {
+			// Check if any of the remaining files are types that we'll need to print
+			remainingFileCount = len(dirContents)-idx
+
+			for remainingFileIndex = range remainingFileCount-1 {
+				info, err := dirContents[idx+remainingFileIndex+1].Info()
+				if err != nil {
+					fmt.Println(err)
+				}
+				ft := getFileType(info.Mode())
+				if slices.Contains(types, ft) {
+					isLast = false
+					break
+				}
+			}
+		}
+
+		if isLast {
 			outputFormat += "└─"
 			indexOfDepth := slices.Index(drawDepths, depth)
 			if indexOfDepth != -1 {
 				drawDepths = append(drawDepths[:indexOfDepth], drawDepths[indexOfDepth+1:]...)
 			}
-			isLast = true
 		} else {
 			outputFormat += "├─"
 		}
@@ -233,6 +248,13 @@ func walk(location string, depth int, drawDepths []int) int {
 			formatEnd = "\x1B[0m"
 		}
 
+		if showType {
+			outputFormat += fmt.Sprintf(
+				" \x1B[2m%s\x1B[0m",
+				fileTypeToSymbolLookup[fileType],
+			)
+		}
+
 		if showPerms {
 			outputFormat += fmt.Sprintf(" [%s]", getFilePermsOctalString(fileInfo.Mode()))
 		}
@@ -246,13 +268,6 @@ func walk(location string, depth int, drawDepths []int) int {
 		// 	}
 		// 	outputFormat += fmt.Sprintf(" %s:%s", owner, group)
 		// }
-
-		if showType {
-			outputFormat += fmt.Sprintf(
-				" \x1B[2m%s\x1B[0m",
-				fileTypeToSymbolLookup[fileType],
-			)
-		}
 
 		// Add the link target to the output
 		outputFormat += " %s%s%s"
@@ -289,7 +304,7 @@ func walk(location string, depth int, drawDepths []int) int {
 			// fmt.Println(recurFilesPrinted)
 
 			// If the user has not filtered for directories and the directory
-			// we just printed contained no files that were filtered for, 
+			// we just printed contained no files that were filtered for,
 			// delete the directory's line from the screen.
 			if recurFilesPrinted == 0 && !slices.Contains(types, Directory) {
 				fmt.Println("\x1B[A\x1B[2K\x1B[A")
@@ -365,6 +380,7 @@ func main() {
 
 	// Remove duplicates from types
 	if len(types) > 0 {
+		types = append(types, Directory) // we always show directories (Directory is always included)
 		slices.Sort(types)
 		types = slices.Compact(types)
 	} else {
