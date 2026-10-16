@@ -1,0 +1,22 @@
+name: Build
+run-name: Automatic build of '${{ gitea.ref }}'
+on: [push]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checking out repo
+        uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version: '1.27'
+      - name: Create build directory
+        run: mkdir build
+      - name: Build wtree
+        run: go build -o build/wtree main.go
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v7
+        with:
+          path: build/wtree
