@@ -23,4 +23,5 @@ jobs:
       - name: Upload build artifact
         uses: https://github.com/christopherHX/gitea-upload-artifact@v4
         with:
+          name: wtree.zip
           path: build/wtree
