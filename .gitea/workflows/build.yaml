@@ -1,5 +1,5 @@
 name: Build
-run-name: Automatic build of push '${{ gitea.ref }}'
+run-name: Automatic build of ${{ gitea.ref_type }} '${{ gitea.ref_name }}'
 on: [push]
 
 jobs:
